@@ -59,13 +59,10 @@ def snapshot():
     with db() as c:
         teams = [dict(r) for r in c.execute("SELECT id,name,score,image_file FROM teams ORDER BY score DESC,id")]
         background = c.execute("SELECT value FROM settings WHERE key='background'").fetchone()
-        history = [dict(r) for r in c.execute("SELECT team_name AS team,delta,reason AS by,created_at AS time FROM history ORDER BY id DESC LIMIT 8")]
-    for e in history:
-        try: e["time"] = datetime.fromisoformat(e["time"]).astimezone().strftime("%d.%m %H:%M")
-        except Exception: pass
     for team in teams:
         team["image_url"] = f"{PUBLIC_BASE_URL}/media/{team['image_file']}" if team.get("image_file") and PUBLIC_BASE_URL else None
-    return {"teams": teams, "history": history, "background_url": f"{PUBLIC_BASE_URL}/media/{background['value']}" if background and PUBLIC_BASE_URL else None}
+        team.pop("image_file", None)
+    return {"teams": teams, "background_url": f"{PUBLIC_BASE_URL}/media/{background['value']}" if background and PUBLIC_BASE_URL else None}
 
 async def api(session, method, payload):
     request_timeout = aiohttp.ClientTimeout(
