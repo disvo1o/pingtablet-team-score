@@ -87,7 +87,12 @@ def snapshot():
     return {"teams": teams, "history": history, "background_url": f"{PUBLIC_BASE_URL}/media/{background['value']}" if background and PUBLIC_BASE_URL else None}
 
 async def api(session, method, payload):
-    async with session.post(f"{API}/{method}", json=payload, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+    request_timeout = aiohttp.ClientTimeout(
+        total=70 if method == "getUpdates" else 25,
+        connect=15,
+        sock_read=65 if method == "getUpdates" else 20,
+    )
+    async with session.post(f"{API}/{method}", json=payload, timeout=request_timeout) as resp:
         data = await resp.json()
         if not data.get("ok"):
             raise RuntimeError(f"{method}: {data.get('description', data)}")
