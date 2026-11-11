@@ -2,29 +2,35 @@
 
 Telegram bot: [@newscorept_bot](https://t.me/newscorept_bot)
 
-## Features
-- Telegram HTML Widget inside the bot's private chat
-- 10 teams, initially 0 points
-- Only Telegram user ID 128835770 can change scores
-- +1, +5, -1, -5 controls; score cannot go below zero
-- Team renaming through `/rename 3 New name`
-- Score reset through `/reset`
-- SQLite score and event history
+## Возможности
+- Табло на 10 команд в Telegram HTML Widget
+- Начальные баллы команд — 0
+- Начисление +50 и +100 доступно только администратору
+- Переименование команд через `/rename 3 Новое название`
+- Загрузка фото команды: отправить фотографию с подписью `/team 3`
+- Загрузка фона табло: отправить фотографию с подписью `/background`
+- SQLite для хранения очков, названий и настроек изображений
 
-## Railway setup
-1. Deploy this repository as a Railway worker.
-2. Add variables:
-   - `BOT_TOKEN` = token from @BotFather
-   - `ADMIN_ID` = `128835770`
-   - `DB_PATH` = `/data/scores.sqlite3`
-3. Add a Railway Volume and mount it at `/data`. This is important: without a volume, the database can be lost when the container is replaced.
-4. Keep one running replica because this version uses long polling.
-5. Open [@newscorept_bot](https://t.me/newscorept_bot) and send `/start`.
+## Настройка Railway
+1. Развернуть репозиторий в Railway.
+2. Добавить переменные:
+   - `BOT_TOKEN` — токен от @BotFather
+   - `ADMIN_ID` — `128835770`
+   - `DB_PATH` — `/data/scores.sqlite3`
+   - `APP_URL` — публичный адрес приложения с `https://` (например, `https://your-app.up.railway.app`)
+3. В Railway открыть Settings → Networking и сгенерировать публичный домен. Его адрес указать в `APP_URL`.
+4. Добавить Railway Volume и подключить его к `/data`. База и изображения сохраняются в этом томе.
+5. Оставить один работающий экземпляр, так как бот использует long polling.
+6. Открыть [@newscorept_bot](https://t.me/newscorept_bot) и отправить `/start`.
 
-## Commands
-- `/start` — send the score widget
-- `/rename 3 New name` — rename a team (admin only)
-- `/reset` — reset all scores to zero (admin only)
+## Команды и загрузка изображений
+- `/start` — открыть табло
+- `/rename 3 Новое название` — переименовать команду (только администратор)
+- `/reset` — сбросить все баллы (только администратор)
+- Отправить фото с подписью `/team 3` — установить изображение команды №3
+- Отправить фото с подписью `/background` — установить фон табло
 
-## Important
-Telegram HTML Widgets are currently supported in production only in private chats with the bot. They are not Mini Apps: the widget has no network access and communicates with the bot using Telegram's `widget_query` updates. Team scores are stored in SQLite; the widget's visible state is updated by the bot.
+Для команды можно загрузить отдельное изображение. Оно будет показываться на карточке, когда команда находится в первой тройке. Новая фотография заменяет старую. Максимальный размер загружаемого изображения — 10 МБ.
+
+## Важно
+Telegram HTML Widgets работают в личном чате с ботом. Бот принимает изображения от администратора, скачивает их и сохраняет в `/data/media`; виджет загружает их с публичного адреса приложения.
