@@ -21,38 +21,19 @@ API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("team-score")
 
-WIDGET_HTML = r"""<!doctype html><html><head><meta charset="utf-8"><style>
-*{box-sizing:border-box}body{margin:0;padding:4px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color);background:var(--tg-theme-bg-color);background-image:var(--board-bg,none);background-size:cover;background-position:center;background-attachment:fixed}.board{padding:4px;border-radius:10px;background:color-mix(in srgb,var(--tg-theme-bg-color) 86%,transparent);backdrop-filter:blur(7px)}
-.podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-bottom:6px}.place{min-width:0;padding:7px 4px;border:1px solid var(--tg-theme-section-separator-color);border-radius:7px;text-align:center;background:var(--tg-theme-secondary-bg-color)}.place .medal{font-size:15px;line-height:17px}.team-image{display:block;width:52px;height:52px;object-fit:cover;border-radius:50%;margin:4px auto;border:2px solid var(--tg-theme-section-separator-color)}.place .pname{font-size:10px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:3px 0}.place .pscore{font-size:14px;font-weight:900}.place .controls{margin-top:5px}
-.section{font-size:9px;font-weight:800;color:var(--tg-theme-hint-color);margin:5px 1px 3px;letter-spacing:.5px}
-.rows{display:flex;flex-direction:column;gap:2px}.team{display:grid;grid-template-columns:15px minmax(0,1fr) auto;align-items:center;gap:4px;padding:3px 5px;border:1px solid var(--tg-theme-section-separator-color);border-radius:6px;min-height:27px}.rank{font-size:10px;color:var(--tg-theme-hint-color);font-weight:800}.name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:13px;font-weight:900;font-variant-numeric:tabular-nums}.controls{display:flex;gap:3px;margin:0}.controls button{flex:1;min-width:0;border:0;border-radius:4px;padding:4px 1px;background:var(--tg-theme-bg-color);color:var(--tg-theme-text-color);font-weight:800;font-size:10px}.controls button:active{opacity:.65}
-.admin-mode .team{grid-template-columns:15px minmax(0,1fr) auto 82px}.admin-mode .place .controls button{background:var(--tg-theme-bg-color)}.admin{font-size:9px;color:var(--tg-theme-hint-color);margin-top:4px;padding:2px 1px}
-.status{font-size:9px;min-height:10px;margin-top:3px;color:var(--tg-theme-hint-color)}
-@media(min-width:500px){.team{grid-template-columns:18px minmax(0,1fr) auto}.admin-mode .team{grid-template-columns:18px minmax(0,1fr) auto 112px}.controls{width:112px}.controls button{padding:4px 2px}}
-</style></head><body>
-<div class="board"><div id="podium" class="podium"></div><div class="section">ОСТАЛЬНЫЕ КОМАНДЫ</div><div id="rows" class="rows"></div></div>
-<div id="admin" class="admin" hidden>Переименовать команду: отправь <b>/rename 3 Новое название</b></div>
-<div id="status" class="status">Загрузка…</div>
+WIDGET_HTML = r"""<!doctype html><meta charset="utf-8"><style>
+*{box-sizing:border-box}body{margin:0;padding:4px;font:13px system-ui;color:var(--tg-theme-text-color);background:var(--tg-theme-bg-color);background-image:var(--bg);background-size:cover;background-position:center}.board{padding:4px;border-radius:10px;background:color-mix(in srgb,var(--tg-theme-bg-color) 88%,transparent)}.podium{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:6px}.place,.team{background:var(--tg-theme-secondary-bg-color);border:1px solid var(--tg-theme-section-separator-color);border-radius:7px}.place{text-align:center;padding:6px 3px;min-width:0}.medal{font-size:15px}.pic{width:48px;height:48px;object-fit:cover;border-radius:50%;display:block;margin:4px auto}.pname{font-size:10px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.score{font-weight:900;font-size:14px}.section{font-size:9px;color:var(--tg-theme-hint-color);margin:5px 0}.rows{display:grid;gap:3px}.team{display:grid;grid-template-columns:18px 1fr auto;align-items:center;gap:4px;padding:4px}.rank{font-size:10px;color:var(--tg-theme-hint-color)}.name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.controls{display:flex;gap:3px;margin-top:4px}.team .controls{margin:0}.controls button{border:0;border-radius:4px;padding:4px;background:var(--tg-theme-bg-color);color:var(--tg-theme-text-color);font-weight:800;font-size:10px}.admin-mode .team{grid-template-columns:18px 1fr auto 82px}.status{font-size:10px;color:var(--tg-theme-hint-color);margin-top:4px}
+</style><div class="board"><div id="podium" class="podium"></div><div class="section">ОСТАЛЬНЫЕ КОМАНДЫ</div><div id="rows" class="rows"></div></div><div id="admin" hidden class="section">Переименовать: /rename 3 Новое название</div><div id="status" class="status">Загрузка…</div>
 <script>
-const W=window.TelegramWidget, ADMIN=128835770;
-let state={teams:[]}, busy=false;
-const $=id=>document.getElementById(id);
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function read(){try{state=JSON.parse(W.chatData||'{}');}catch(e){state={teams:[],history:[]};} if(!Array.isArray(state.teams))state.teams=[];if(state.background_url)document.body.style.setProperty('--board-bg','url("'+state.background_url+'")');render();}
-function render(){
- const teams=[...state.teams].sort((a,b)=>b.score-a.score||a.id-b.id);
- const admin=Number(W.viewer&&W.viewer.id)===ADMIN;
- document.body.classList.toggle('admin-mode',admin);
- $('admin').hidden=!admin;
- const card=(t,i)=>'<div class="place"><div class="medal">'+(['🥇','🥈','🥉'][i])+'</div>'+(t.image_url?'<img class="team-image" src="'+esc(t.image_url)+'" alt="">':'')+'<div class="pname">'+esc(t.name)+'</div><div class="pscore">'+t.score+'</div>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="50">+50</button><button data-id="'+t.id+'" data-d="100">+100</button></div>':'')+'</div>';
- $('podium').innerHTML=teams.slice(0,3).map((t,i)=>card(t,i)).join('');
- $('rows').innerHTML=teams.slice(3).map((t,i)=>'<div class="team"><div class="rank">'+(i+4)+'</div><div class="name">'+esc(t.name)+'</div><div class="score">'+t.score+'</div>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="50">+50</button><button data-id="'+t.id+'" data-d="100">+100</button></div>':'')+'</div>').join('');
- $('status').textContent=admin?'Вы вошли как администратор':'Просмотр';
-}
-$('rows').addEventListener('click',e=>{const b=e.target.closest('button[data-id]');if(!b||busy)return;const id=b.dataset.id,delta=Number(b.dataset.d);busy=true;$('status').textContent='Сохраняем…';W.request('score:'+id+':'+delta).then(a=>{if(a.result){try{state=JSON.parse(a.result);render();}catch(_){}}$('status').textContent='Результат обновлён';}).catch(err=>$('status').textContent='Ошибка: '+(err.code||err.name)).finally(()=>busy=false);});
-W.onEvent('chatDataChanged',read);read();
-W.request('refresh').then(a=>{if(a.result){try{state=JSON.parse(a.result);render();}catch(_){}}}).catch(()=>{});
-</script></body></html>"""
+const W=window.TelegramWidget,$=id=>document.getElementById(id);let state={teams:[]},busy=false;
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function render(){let ts=[...state.teams].sort((a,b)=>b.score-a.score||a.id-b.id),admin=Number(W.viewer&&W.viewer.id)===128835770;document.body.classList.toggle('admin-mode',admin);$('admin').hidden=!admin;
+$('podium').innerHTML=ts.slice(0,3).map((t,i)=>'<div class="place"><div class="medal">'+['🥇','🥈','🥉'][i]+'</div>'+(t.image_url?'<img class="pic" src="'+esc(t.image_url)+'">':'')+'<div class="pname">'+esc(t.name)+'</div><div class="score">'+t.score+'</div>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="50">+50</button><button data-id="'+t.id+'" data-d="100">+100</button></div>':'')+'</div>').join('');
+$('rows').innerHTML=ts.slice(3).map((t,i)=>'<div class="team"><span class="rank">'+(i+4)+'</span><span class="name">'+esc(t.name)+'</span><b class="score">'+t.score+'</b>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="50">+50</button><button data-id="'+t.id+'" data-d="100">+100</button></div>':'')+'</div>').join('');$('status').textContent=admin?'Режим администратора':'Просмотр'}
+function read(){try{state=JSON.parse(W.chatData||'{}')}catch(e){state={teams:[]}}if(!Array.isArray(state.teams))state.teams=[];if(state.background_url)document.body.style.setProperty('--bg','url("'+state.background_url+'")');render()}
+document.addEventListener('click',e=>{let b=e.target.closest('button[data-id]');if(!b||busy)return;busy=true;$('status').textContent='Сохраняем…';W.request('score:'+b.dataset.id+':'+b.dataset.d).then(a=>{if(a.result){state=JSON.parse(a.result);render()}$('status').textContent='Обновлено'}).catch(()=>$('status').textContent='Ошибка').finally(()=>busy=false)});
+W.onEvent('chatDataChanged',read);read();W.request('refresh').then(a=>{if(a.result){state=JSON.parse(a.result);render()}}).catch(()=>{});
+</script>"""
 
 def db():
     os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
