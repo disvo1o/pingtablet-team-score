@@ -109,9 +109,11 @@ async def handle_message(session, msg):
         return
     text = (msg.get("text") or "").strip()
     user_id = msg.get("from",{}).get("id")
+
     if text.startswith("/start"):
         await send_widget(session, chat["id"])
         return
+
     if text.startswith("/rename"):
         if user_id != ADMIN_ID:
             await api(session,"sendMessage",{"chat_id":chat["id"],"text":"У тебя нет прав администратора."}); return
@@ -128,18 +130,53 @@ async def handle_message(session, msg):
         except Exception:
             await api(session,"sendMessage",{"chat_id":chat["id"],"text":"Формат: /rename 3 Новое название (номер команды от 1 до 10, до 32 символов)."})
         return
+
+    # Поддерживаем оба способа: команда в подписи к фото или команда отдельным сообщением перед фото.
+    if text and (text.split()[0].lower().split("@")[0] in ("/team", "/background")):
+        if user_id != ADMIN_ID:
+            await api(session,"sendMessage",{"chat_id":chat["id"],"text":"Загружать изображения может только администратор."}); return
+        parts=text.split()
+        try:
+            if parts[0].lower().split("@")[0] == "/background" and len(parts)==1:
+                kind, team_id = "background", None
+            elif parts[0].lower().split("@")[0] == "/team" and len(parts)==2:
+                team_id=int(parts[1])
+                if not 1<=team_id<=10: raise ValueError()
+                kind="team"
+            else:
+                raise ValueError()
+            with db() as c:
+                c.execute("INSERT OR REPLACE INTO settings(key,value) VALUES('pending_upload',?)",
+                          (f"{kind}:{team_id if team_id is not None else ''}",))
+            await api(session,"sendMessage",{"chat_id":chat["id"],"text":"Теперь отправь фотографию следующим сообщением. Можно также сразу отправить фото с подписью /team 3 или /background."})
+        except Exception:
+            await api(session,"sendMessage",{"chat_id":chat["id"],"text":"Формат команды: /team 3 или /background."})
+        return
+
     if msg.get("photo"):
         if user_id != ADMIN_ID:
             await api(session,"sendMessage",{"chat_id":chat["id"],"text":"Загружать изображения может только администратор."}); return
         caption=(msg.get("caption") or "").strip().split()
         try:
-            if len(caption)==1 and caption[0].lower()=="/background":
-                kind="background"; team_id=None
-            elif len(caption)==2 and caption[0].lower()=="/team":
-                team_id=int(caption[1])
-                if not 1<=team_id<=10: raise ValueError()
-                kind="team"
-            else: raise ValueError()
+            kind, team_id = None, None
+            if caption:
+                command=caption[0].lower().split("@")[0]
+                if command=="/background" and len(caption)==1:
+                    kind="background"
+                elif command=="/team" and len(caption)==2:
+                    team_id=int(caption[1])
+                    if not 1<=team_id<=10: raise ValueError("Номер команды должен быть от 1 до 10")
+                    kind="team"
+            if kind is None:
+                with db() as c:
+                    pending=c.execute("SELECT value FROM settings WHERE key='pending_upload'").fetchone()
+                if pending:
+                    value=pending["value"].split(":")
+                    kind=value[0]
+                    team_id=int(value[1]) if len(value)>1 and value[1] else None
+            if kind not in ("team","background") or (kind=="team" and team_id is None):
+                await api(session,"sendMessage",{"chat_id":chat["id"],"text":"Не понял, куда сохранить фото. Сначала отправь /team 3 или /background, затем фото. Либо прикрепи эту команду к фото как подпись."})
+                return
             if not PUBLIC_BASE_URL: raise RuntimeError("Set APP_URL or RAILWAY_PUBLIC_DOMAIN")
             photo=msg["photo"][-1]
             file_info=await api(session,"getFile",{"file_id":photo["file_id"]})
@@ -151,14 +188,18 @@ async def handle_message(session, msg):
             filename=f"{kind}_{team_id if team_id is not None else 'main'}.jpg"
             (MEDIA_DIR/filename).write_bytes(image_bytes)
             with db() as c:
-                if kind=="team": c.execute("UPDATE teams SET image_file=? WHERE id=?",(filename,team_id))
-                else: c.execute("INSERT OR REPLACE INTO settings(key,value) VALUES('background',?)",(filename,))
+                if kind=="team":
+                    c.execute("UPDATE teams SET image_file=? WHERE id=?",(filename,team_id))
+                else:
+                    c.execute("INSERT OR REPLACE INTO settings(key,value) VALUES('background',?)",(filename,))
+                c.execute("DELETE FROM settings WHERE key='pending_upload'")
             await send_state_to_subscribers(session)
             await api(session,"sendMessage",{"chat_id":chat["id"],"text":("Изображение команды "+str(team_id)+" обновлено.") if kind=="team" else "Фон табло обновлён."})
-        except Exception:
+        except Exception as e:
             log.exception("Image upload failed")
-            await api(session,"sendMessage",{"chat_id":chat["id"],"text":"Не удалось загрузить. Отправь фото с подписью /team 3 или /background. Убедись, что задан публичный URL приложения (APP_URL)."})
+            await api(session,"sendMessage",{"chat_id":chat["id"],"text":f"Не удалось загрузить изображение: {str(e)[:180]}. Проверь APP_URL и доступность Railway."})
         return
+
     if text.startswith("/reset"):
         if user_id != ADMIN_ID:
             await api(session,"sendMessage",{"chat_id":chat["id"],"text":"У тебя нет прав администратора."}); return
