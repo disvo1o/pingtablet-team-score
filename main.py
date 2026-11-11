@@ -16,13 +16,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("team-score")
 
 WIDGET_HTML = r"""<!doctype html><html><head><meta charset="utf-8"><style>
-*{box-sizing:border-box}body{margin:0;padding:3px 4px 5px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color);background:var(--tg-theme-bg-color)}
-.rows{display:flex;flex-direction:column;gap:2px}.team{display:grid;grid-template-columns:15px minmax(0,1fr) auto;align-items:center;gap:4px;padding:3px 5px;border:1px solid var(--tg-theme-section-separator-color);border-radius:6px;min-height:29px}.rank{font-size:10px;color:var(--tg-theme-hint-color);font-weight:800}.name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:13px;font-weight:900;font-variant-numeric:tabular-nums}.controls{display:flex;gap:3px;margin:0}.controls button{flex:1;min-width:0;border:0;border-radius:4px;padding:4px 1px;background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-text-color);font-weight:800;font-size:11px}.controls button:active{opacity:.65}
-.admin-mode .team{grid-template-columns:15px minmax(0,1fr) auto 92px}.admin{font-size:9px;color:var(--tg-theme-hint-color);margin-top:4px;padding:2px 1px}
+*{box-sizing:border-box}body{margin:0;padding:4px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color);background:var(--tg-theme-bg-color)}
+.podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-bottom:6px}.place{min-width:0;padding:7px 4px;border:1px solid var(--tg-theme-section-separator-color);border-radius:7px;text-align:center;background:var(--tg-theme-secondary-bg-color)}.place .medal{font-size:15px;line-height:17px}.place .pname{font-size:10px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:3px 0}.place .pscore{font-size:14px;font-weight:900}.place .controls{margin-top:5px}
+.section{font-size:9px;font-weight:800;color:var(--tg-theme-hint-color);margin:5px 1px 3px;letter-spacing:.5px}
+.rows{display:flex;flex-direction:column;gap:2px}.team{display:grid;grid-template-columns:15px minmax(0,1fr) auto;align-items:center;gap:4px;padding:3px 5px;border:1px solid var(--tg-theme-section-separator-color);border-radius:6px;min-height:27px}.rank{font-size:10px;color:var(--tg-theme-hint-color);font-weight:800}.name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:13px;font-weight:900;font-variant-numeric:tabular-nums}.controls{display:flex;gap:3px;margin:0}.controls button{flex:1;min-width:0;border:0;border-radius:4px;padding:4px 1px;background:var(--tg-theme-bg-color);color:var(--tg-theme-text-color);font-weight:800;font-size:10px}.controls button:active{opacity:.65}
+.admin-mode .team{grid-template-columns:15px minmax(0,1fr) auto 82px}.admin-mode .place .controls button{background:var(--tg-theme-bg-color)}.admin{font-size:9px;color:var(--tg-theme-hint-color);margin-top:4px;padding:2px 1px}
 .status{font-size:9px;min-height:10px;margin-top:3px;color:var(--tg-theme-hint-color)}
 @media(min-width:500px){.team{grid-template-columns:18px minmax(0,1fr) auto}.admin-mode .team{grid-template-columns:18px minmax(0,1fr) auto 112px}.controls{width:112px}.controls button{padding:4px 2px}}
 </style></head><body>
-<div id="rows" class="rows"></div>
+<div id="podium" class="podium"></div><div class="section">ОСТАЛЬНЫЕ КОМАНДЫ</div><div id="rows" class="rows"></div>
 <div id="admin" class="admin" hidden>Переименовать команду: отправь <b>/rename 3 Новое название</b></div>
 <div id="status" class="status">Загрузка…</div>
 <script>
@@ -36,7 +38,9 @@ function render(){
  const admin=Number(W.viewer&&W.viewer.id)===ADMIN;
  document.body.classList.toggle('admin-mode',admin);
  $('admin').hidden=!admin;
- $('rows').innerHTML=teams.map((t,i)=>'<div class="team"><div class="rank">'+(i+1)+'</div><div class="name">'+esc(t.name)+'</div><div class="score">'+t.score+'</div>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="50">+50</button><button data-id="'+t.id+'" data-d="100">+100</button></div>':'')+'</div>').join('');
+ const card=(t,i)=>'<div class="place"><div class="medal">'+(['🥇','🥈','🥉'][i])+'</div><div class="pname">'+esc(t.name)+'</div><div class="pscore">'+t.score+'</div>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="50">+50</button><button data-id="'+t.id+'" data-d="100">+100</button></div>':'')+'</div>';
+ $('podium').innerHTML=teams.slice(0,3).map((t,i)=>card(t,i)).join('');
+ $('rows').innerHTML=teams.slice(3).map((t,i)=>'<div class="team"><div class="rank">'+(i+4)+'</div><div class="name">'+esc(t.name)+'</div><div class="score">'+t.score+'</div>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="50">+50</button><button data-id="'+t.id+'" data-d="100">+100</button></div>':'')+'</div>').join('');
  $('status').textContent=admin?'Вы вошли как администратор':'Просмотр';
 }
 $('rows').addEventListener('click',e=>{const b=e.target.closest('button[data-id]');if(!b||busy)return;const id=b.dataset.id,delta=Number(b.dataset.d);busy=true;$('status').textContent='Сохраняем…';W.request('score:'+id+':'+delta).then(a=>{if(a.result){try{state=JSON.parse(a.result);render();}catch(_){}}$('status').textContent='Результат обновлён';}).catch(err=>$('status').textContent='Ошибка: '+(err.code||err.name)).finally(()=>busy=false);});
