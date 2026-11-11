@@ -17,15 +17,16 @@ log = logging.getLogger("team-score")
 
 WIDGET_HTML = r"""<!doctype html><html><head><meta charset="utf-8"><style>
 *{box-sizing:border-box}body{margin:0;padding:10px 10px 18px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color);background:var(--tg-theme-bg-color)}
-.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.brand{font-size:11px;letter-spacing:1.5px;color:var(--tg-theme-hint-color);font-weight:800}.title{font-size:19px;font-weight:900;letter-spacing:-.5px}.live{font-size:10px;color:var(--tg-theme-accent-text-color);font-weight:800}
-.podium{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0 12px}.pod{background:var(--tg-theme-secondary-bg-color);border-radius:10px;padding:8px 5px;text-align:center;min-width:0}.pod .medal{font-size:16px}.pod .pn{font-size:10px;color:var(--tg-theme-hint-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pod .pts{font-size:18px;font-weight:900;font-variant-numeric:tabular-nums}
-.rows{display:flex;flex-direction:column;gap:5px}.team{display:grid;grid-template-columns:22px 1fr auto;align-items:center;gap:8px;padding:8px 9px;border:1px solid var(--tg-theme-section-separator-color);border-radius:9px;min-height:42px}.rank{font-size:12px;color:var(--tg-theme-hint-color);font-weight:800}.name{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:16px;font-weight:900;font-variant-numeric:tabular-nums}.controls{grid-column:2/4;display:flex;gap:5px;margin-top:2px}.controls button{flex:1;min-width:0;border:0;border-radius:6px;padding:6px 2px;background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-text-color);font-weight:800;font-size:12px}.controls button:active{opacity:.65}.controls .minus{color:var(--tg-theme-destructive-text-color)}
-.admin{margin-top:12px;padding:10px;background:var(--tg-theme-secondary-bg-color);border-radius:10px}.adminhead{font-size:11px;font-weight:900;letter-spacing:1px;margin-bottom:7px}.hint{font-size:10px;color:var(--tg-theme-hint-color);margin-top:7px}.history{margin-top:12px}.history summary{font-size:12px;font-weight:800;color:var(--tg-theme-hint-color)}.event{font-size:10px;padding:5px 0;border-bottom:1px solid var(--tg-theme-section-separator-color);color:var(--tg-theme-hint-color)}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.brand{font-size:10px;letter-spacing:1.2px;color:var(--tg-theme-hint-color);font-weight:800}.title{font-size:16px;font-weight:900;letter-spacing:-.4px}.live{font-size:9px;color:var(--tg-theme-accent-text-color);font-weight:800}
+.podium{display:none}
+.rows{display:flex;flex-direction:column;gap:3px}.team{display:grid;grid-template-columns:18px minmax(0,1fr) auto;align-items:center;gap:6px;padding:5px 7px;border:1px solid var(--tg-theme-section-separator-color);border-radius:7px;min-height:34px}.rank{font-size:10px;color:var(--tg-theme-hint-color);font-weight:800}.name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:14px;font-weight:900;font-variant-numeric:tabular-nums}.controls{grid-column:2/4;display:flex;gap:4px;margin-top:3px}.controls button{flex:1;min-width:0;border:0;border-radius:5px;padding:5px 2px;background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-text-color);font-weight:800;font-size:11px}.controls button:active{opacity:.65}
+.admin{margin-top:7px;padding:7px;background:var(--tg-theme-secondary-bg-color);border-radius:8px}.adminhead{font-size:10px;font-weight:900;letter-spacing:.8px;margin-bottom:4px}.hint{font-size:9px;color:var(--tg-theme-hint-color);margin-top:4px}.history{margin-top:7px}.history summary{font-size:11px;font-weight:800;color:var(--tg-theme-hint-color)}.event{font-size:9px;padding:4px 0;border-bottom:1px solid var(--tg-theme-section-separator-color);color:var(--tg-theme-hint-color)}
+@media(min-width:500px){.team{grid-template-columns:20px minmax(0,1fr) auto auto}.controls{grid-column:auto;margin:0;width:120px}.controls button{padding:4px 2px}}
 .status{font-size:10px;min-height:14px;margin-top:7px;color:var(--tg-theme-hint-color)}
 </style></head><body>
 <div class="head"><div><div class="brand">PING TABLET</div><div class="title">TEAM SCORE</div></div><div class="live">● LIVE RATING</div></div>
 <div id="podium" class="podium"></div><div id="rows" class="rows"></div>
-<div id="admin" class="admin" hidden><div class="adminhead">УПРАВЛЕНИЕ БАЛЛАМИ</div><div class="hint">Нажми +1 / +5 или −1 / −5 у нужной команды.</div></div>
+<div id="admin" class="admin" hidden><div class="adminhead">УПРАВЛЕНИЕ БАЛЛАМИ</div><div class="hint">Нажми +50 или +100 у нужной команды.</div></div>
 <details class="history"><summary>ИСТОРИЯ ИЗМЕНЕНИЙ</summary><div id="history"></div></details>
 <div id="status" class="status">Загрузка результатов…</div>
 <script>
@@ -40,7 +41,7 @@ function render(){
  $('podium').innerHTML=teams.slice(0,3).map((t,i)=>'<div class="pod"><div class="medal">'+medals[i]+'</div><div class="pn">'+esc(t.name)+'</div><div class="pts">'+t.score+'</div></div>').join('');
  const admin=Number(W.viewer&&W.viewer.id)===ADMIN;
  $('admin').hidden=!admin;
- $('rows').innerHTML=teams.map((t,i)=>'<div class="team"><div class="rank">'+(i+1)+'</div><div class="name">'+esc(t.name)+'</div><div class="score">'+t.score+'</div>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="-5" class="minus">−5</button><button data-id="'+t.id+'" data-d="-1" class="minus">−1</button><button data-id="'+t.id+'" data-d="1">+1</button><button data-id="'+t.id+'" data-d="5">+5</button></div>':'')+'</div>').join('');
+ $('rows').innerHTML=teams.map((t,i)=>'<div class="team"><div class="rank">'+(i+1)+'</div><div class="name">'+esc(t.name)+'</div><div class="score">'+t.score+'</div>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="50">+50</button><button data-id="'+t.id+'" data-d="100">+100</button></div>':'')+'</div>').join('');
  $('history').innerHTML=state.history.slice(0,8).map(e=>'<div class="event">'+esc(e.time)+' · '+esc(e.team)+' · '+(e.delta>0?'+':'')+e.delta+' · '+esc(e.by||'Администратор')+'</div>').join('')||'<div class="event">Пока нет изменений</div>';
  $('status').textContent=admin?'Режим администратора':'Только просмотр';
 }
@@ -161,7 +162,7 @@ async def handle_widget_query(session, q):
         try:
             _, team_id, delta = data.split(":")
             team_id=int(team_id); delta=int(delta)
-            if not 1<=team_id<=10 or delta not in (-5,-1,1,5): raise ValueError()
+            if not 1<=team_id<=10 or delta not in (50,100): raise ValueError()
             with db() as c:
                 row=c.execute("SELECT name,score FROM teams WHERE id=?",(team_id,)).fetchone()
                 if row is None: raise ValueError()
