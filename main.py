@@ -16,34 +16,27 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 log = logging.getLogger("team-score")
 
 WIDGET_HTML = r"""<!doctype html><html><head><meta charset="utf-8"><style>
-*{box-sizing:border-box}body{margin:0;padding:10px 10px 18px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color);background:var(--tg-theme-bg-color)}
-.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.brand{font-size:10px;letter-spacing:1.2px;color:var(--tg-theme-hint-color);font-weight:800}.title{font-size:16px;font-weight:900;letter-spacing:-.4px}.live{font-size:9px;color:var(--tg-theme-accent-text-color);font-weight:800}
-.podium{display:none}
-.rows{display:flex;flex-direction:column;gap:3px}.team{display:grid;grid-template-columns:16px minmax(0,1fr) auto 88px;align-items:center;gap:5px;padding:4px 6px;border:1px solid var(--tg-theme-section-separator-color);border-radius:7px;min-height:32px}.rank{font-size:10px;color:var(--tg-theme-hint-color);font-weight:800}.name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:14px;font-weight:900;font-variant-numeric:tabular-nums}.controls{grid-column:auto;display:flex;gap:3px;margin:0}.controls button{flex:1;min-width:0;border:0;border-radius:5px;padding:5px 1px;background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-text-color);font-weight:800;font-size:11px}.controls button:active{opacity:.65}
-.admin{margin-top:7px;padding:7px;background:var(--tg-theme-secondary-bg-color);border-radius:8px}.adminhead{font-size:10px;font-weight:900;letter-spacing:.8px;margin-bottom:4px}.hint{font-size:9px;color:var(--tg-theme-hint-color);margin-top:4px}.history{margin-top:7px}.history summary{font-size:11px;font-weight:800;color:var(--tg-theme-hint-color)}.event{font-size:9px;padding:4px 0;border-bottom:1px solid var(--tg-theme-section-separator-color);color:var(--tg-theme-hint-color)}
-@media(min-width:500px){.team{grid-template-columns:20px minmax(0,1fr) auto 112px}.controls{width:112px}.controls button{padding:4px 2px}}
-.status{font-size:10px;min-height:14px;margin-top:7px;color:var(--tg-theme-hint-color)}
+*{box-sizing:border-box}body{margin:0;padding:3px 4px 5px;font-family:system-ui,sans-serif;color:var(--tg-theme-text-color);background:var(--tg-theme-bg-color)}
+.rows{display:flex;flex-direction:column;gap:2px}.team{display:grid;grid-template-columns:15px minmax(0,1fr) auto 92px;align-items:center;gap:4px;padding:3px 5px;border:1px solid var(--tg-theme-section-separator-color);border-radius:6px;min-height:29px}.rank{font-size:10px;color:var(--tg-theme-hint-color);font-weight:800}.name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.score{font-size:13px;font-weight:900;font-variant-numeric:tabular-nums}.controls{display:flex;gap:3px;margin:0}.controls button{flex:1;min-width:0;border:0;border-radius:4px;padding:4px 1px;background:var(--tg-theme-secondary-bg-color);color:var(--tg-theme-text-color);font-weight:800;font-size:11px}.controls button:active{opacity:.65}
+.admin{font-size:9px;color:var(--tg-theme-hint-color);margin-top:4px;padding:2px 1px}
+.status{font-size:9px;min-height:10px;margin-top:3px;color:var(--tg-theme-hint-color)}
+@media(min-width:500px){.team{grid-template-columns:18px minmax(0,1fr) auto 112px}.controls{width:112px}.controls button{padding:4px 2px}}
 </style></head><body>
-<div class="head"><div><div class="brand">PING TABLET</div><div class="title">TEAM SCORE</div></div><div class="live">● LIVE RATING</div></div>
-<div id="podium" class="podium"></div><div id="rows" class="rows"></div>
-<div id="admin" class="admin" hidden><div class="adminhead">УПРАВЛЕНИЕ БАЛЛАМИ</div><div class="hint">Нажми +50 или +100 у нужной команды.</div></div>
-<details class="history"><summary>ИСТОРИЯ ИЗМЕНЕНИЙ</summary><div id="history"></div></details>
-<div id="status" class="status">Загрузка результатов…</div>
+<div id="rows" class="rows"></div>
+<div id="admin" class="admin" hidden>Переименовать команду: отправь <b>/rename 3 Новое название</b></div>
+<div id="status" class="status">Загрузка…</div>
 <script>
 const W=window.TelegramWidget, ADMIN=128835770;
-let state={teams:[],history:[]}, busy=false;
+let state={teams:[]}, busy=false;
 const $=id=>document.getElementById(id);
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function read(){try{state=JSON.parse(W.chatData||'{}');}catch(e){state={teams:[],history:[]};} if(!Array.isArray(state.teams))state.teams=[];if(!Array.isArray(state.history))state.history=[];render();}
+function read(){try{state=JSON.parse(W.chatData||'{}');}catch(e){state={teams:[],history:[]};} if(!Array.isArray(state.teams))state.teams=[];render();}
 function render(){
  const teams=[...state.teams].sort((a,b)=>b.score-a.score||a.id-b.id);
- const medals=['🥇','🥈','🥉'];
- $('podium').innerHTML=teams.slice(0,3).map((t,i)=>'<div class="pod"><div class="medal">'+medals[i]+'</div><div class="pn">'+esc(t.name)+'</div><div class="pts">'+t.score+'</div></div>').join('');
  const admin=Number(W.viewer&&W.viewer.id)===ADMIN;
  $('admin').hidden=!admin;
  $('rows').innerHTML=teams.map((t,i)=>'<div class="team"><div class="rank">'+(i+1)+'</div><div class="name">'+esc(t.name)+'</div><div class="score">'+t.score+'</div>'+(admin?'<div class="controls"><button data-id="'+t.id+'" data-d="50">+50</button><button data-id="'+t.id+'" data-d="100">+100</button></div>':'')+'</div>').join('');
- $('history').innerHTML=state.history.slice(0,8).map(e=>'<div class="event">'+esc(e.time)+' · '+esc(e.team)+' · '+(e.delta>0?'+':'')+e.delta+' · '+esc(e.by||'Администратор')+'</div>').join('')||'<div class="event">Пока нет изменений</div>';
- $('status').textContent=admin?'Режим администратора':'Только просмотр';
+ $('status').textContent=admin?'Вы вошли как администратор':'Просмотр';
 }
 $('rows').addEventListener('click',e=>{const b=e.target.closest('button[data-id]');if(!b||busy)return;const id=b.dataset.id,delta=Number(b.dataset.d);busy=true;$('status').textContent='Сохраняем…';W.request('score:'+id+':'+delta).then(a=>{if(a.result){try{state=JSON.parse(a.result);render();}catch(_){}}$('status').textContent='Результат обновлён';}).catch(err=>$('status').textContent='Ошибка: '+(err.code||err.name)).finally(()=>busy=false);});
 W.onEvent('chatDataChanged',read);read();
@@ -96,7 +89,6 @@ async def send_widget(session, chat_id):
     msg = await api(session, "sendWidget", {
         "chat_id": chat_id,
         "html": WIDGET_HTML,
-        "caption": "PING TABLET — рейтинг 10 команд",
         "allow_queries": True,
         "chat_data": json.dumps(snapshot(), ensure_ascii=False, separators=(",",":"))
     })
