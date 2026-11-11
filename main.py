@@ -60,9 +60,17 @@ def snapshot():
         teams = [dict(r) for r in c.execute("SELECT id,name,score,image_file FROM teams ORDER BY score DESC,id")]
         background = c.execute("SELECT value FROM settings WHERE key='background'").fetchone()
     for team in teams:
-        team["image_url"] = f"{PUBLIC_BASE_URL}/media/{team['image_file']}" if team.get("image_file") and PUBLIC_BASE_URL else None
+        image_file = team.get("image_file")
+        image_path = MEDIA_DIR / image_file if image_file else None
+        version = int(image_path.stat().st_mtime_ns) if image_path and image_path.is_file() else 0
+        team["image_url"] = f"{PUBLIC_BASE_URL}/media/{image_file}?v={version}" if image_file and PUBLIC_BASE_URL else None
         team.pop("image_file", None)
-    return {"teams": teams, "background_url": f"{PUBLIC_BASE_URL}/media/{background['value']}" if background and PUBLIC_BASE_URL else None}
+    background_url = None
+    if background and PUBLIC_BASE_URL:
+        background_path = MEDIA_DIR / background["value"]
+        version = int(background_path.stat().st_mtime_ns) if background_path.is_file() else 0
+        background_url = f"{PUBLIC_BASE_URL}/media/{background['value']}?v={version}"
+    return {"teams": teams, "background_url": background_url}
 
 async def api(session, method, payload):
     request_timeout = aiohttp.ClientTimeout(
